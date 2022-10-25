@@ -1,16 +1,3 @@
-+ cc[USER] user/lsfd.c
-+ ld obj/user/lsfd
-+ cc[USER] user/num.c
-+ ld obj/user/num
-+ cc[USER] user/forktree.c
-+ ld obj/user/forktree
-+ cc[USER] user/primes.c
-+ ld obj/user/primes
-+ cc[USER] user/vmmanager.c
-+ ld obj/user/vmmanager
-+ cc[USER] user/init.c
-+ ld obj/user/init
-+ mk obj/fs/clean-fs.img
 + cp obj/fs/clean-fs.img obj/fs/fs.img
 ***
 *** Now run 'gdb'.
@@ -52,14 +39,14 @@ pp_ref incremented correctly
 sys_ept_map finished normally.
 sys_ept_map handled pp_ref correctly.
 EPT lookup with a null eptrt failed as expected
-EPT mapping address looks good: 8b9000 vs 8b9000.
+EPT mapping address looks good: 8b8000 vs 8b8000.
 map_hva2gpa handle not overwriting correctly
 map_hva2gpa success on mapping a page
 map_hva2gpa success on perm check
 EPT immediate mapping check passed
 Cheers! sys_ept_map seems to work correctly.
-kernel panic on CPU 0 at ../vmm/ept.c:379: sys_ept_map passed.
+kernel panic on CPU 0 at ../vmm/ept.c:362: sys_ept_map passed.
 
 Welcome to the JOS kernel monitor!
 Type 'help' for a list of commands.
-qemu: terminating on signal 15 from pid 17835
+qemu: terminating on signal 15 from pid 25858

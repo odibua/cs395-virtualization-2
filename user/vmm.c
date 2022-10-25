@@ -21,59 +21,54 @@ map_in_guest(envid_t guest, uintptr_t gpa, size_t memsz,
 			 int fd, size_t filesz, off_t fileoffset)
 {
 	/* Your code here */
-	int index = 0;
-	int statusFlag = -1;
+	int pgOffsetVal = 0;
+	// error handling status var
+	int status = -1;
+	// page table perms: present user writable
+	int userPerm = PTE_P | PTE_U | PTE_W;
 
-	//Round down to the nearest multiple of PGSIZE starting at guest's phy addr
-	if (PGOFF(gpa) != 0)
-		ROUNDDOWN(gpa, PGSIZE);
+	// get integer id for currenv
+	envid_t envId;
+	envId = sys_getenvid();
 
-	for (index = 0; index < memsz; index += PGSIZE)
+	pgOffsetVal = PGOFF(gpa);
+
+	if ((pgOffsetVal != 0)) // offset exists
 	{
-		if (index < filesz)
+		gpa = gpa - pgOffsetVal;
+		memsz = memsz + pgOffsetVal;
+		filesz = filesz + pgOffsetVal;
+		fileoffset = fileoffset - pgOffsetVal;
+	}
+
+	for (pgOffsetVal = 0; pgOffsetVal < memsz; pgOffsetVal += PGSIZE)
+	{
+		status = sys_page_alloc(envId, UTEMP, userPerm);
+		if (status < 0)
+			return -E_NO_MEM; // alloc failed
+
+		// fill the block of memory
+		memset(UTEMP, 0, PGSIZE);
+
+		if (pgOffsetVal < filesz)
 		{
-			/* alloc a page in the env,temp map to use, permission flags as arg 3
-			PTE_P- is present check */
-			statusFlag = sys_page_alloc(thisenv->env_id, UTEMP, PTE_P | PTE_U | PTE_W);
+			status = seek(fd, fileoffset + pgOffsetVal);
+			if (status < 0)
+				return -E_FAULT;
 
-			if (statusFlag < 0)
-				return statusFlag;
-
-			// from offset loc, move page by page, index increments by pagesize
-			statusFlag = seek(fd, fileoffset + index);
-			if (statusFlag < 0)
-				return statusFlag;
-
-			// read opened file
-			statusFlag = readn(fd, UTEMP, MIN(PGSIZE, filesz - index));
-			if (statusFlag < 0)
-				return statusFlag;
-
-			// page to be mapped for guest
-			statusFlag = sys_ept_map(thisenv->env_id, (void *)UTEMP, guest, (void *)(gpa + index), __EPTE_FULL);
-			if (statusFlag < 0){
-				cprintf("Page map failure (If block): %e", statusFlag);
-				panic("Page map failure - If block");
-			}
-			// Unmap - not req anymore
-			sys_page_unmap(thisenv->env_id, UTEMP);
+			// read frmo the file
+			status = readn(fd, UTEMP, MIN(PGSIZE, filesz - pgOffsetVal));
+			if (status < 0)
+				return -E_NOT_FOUND; // read failed
 		}
 
-		else
-		{
-			statusFlag = sys_page_alloc(thisenv->env_id, (void *)UTEMP, __EPTE_FULL);
-			if (statusFlag < 0)
-				return statusFlag;
+		// map the addr
+		status = sys_ept_map(envId, UTEMP, guest, (void *)gpa + pgOffsetVal, __EPTE_FULL);
 
-			statusFlag = sys_ept_map(thisenv->env_id, UTEMP, guest, (void *)(gpa + index), __EPTE_FULL);
-
-			if (statusFlag < 0){
-				cprintf("Page map failure (else block): %e", statusFlag);
-				panic("Page map failure - else block");
-			}
-			//unmap
-			sys_page_unmap(thisenv->env_id, UTEMP);
-		}
+		if (status < 0)
+			return -E_FAULT;
+		// unmap coz not needed now
+		sys_page_unmap(envId, UTEMP);
 	}
 	return 0; // success
 }
@@ -89,20 +84,20 @@ copy_guest_kern_gpa(envid_t guest, char *fname)
 {
 	/* Your code here */
 
-	int fileDesc = -1; 		//to be able to read
-	int mapStatus = -1;		
-	char fileData[1024];	//how much to read into buffer	
-	struct Elf *fileHeader;	//binary validation using this struct to be done
-	size_t totalRead = 0;	//to error check, binary validation
+	int fileDesc = -1; // to be able to read
+	int mapStatus = -1;
+	char fileData[256];		// how much to read into buffer at a time: bytes
+	struct Elf *fileHeader; // binary validation using this struct to be done
+	ssize_t totalRead = 0;	// to error check, binary validation
 
 	// open file in readonly mode
 	fileDesc = open(fname, O_RDONLY);
 
-	//error opening file
+	// error opening file
 	if (fileDesc < 0)
 		return -E_NOT_FOUND;
 
-	//if opened, read into buffer
+	// if opened, read into buffer
 	totalRead = readn(fileDesc, fileData, sizeof(fileData));
 
 	if (totalRead != sizeof(fileData))
@@ -114,7 +109,7 @@ copy_guest_kern_gpa(envid_t guest, char *fname)
 	fileHeader = (struct Elf *)fileData;
 
 	/*recall his header typically starts with a sequence of four unique bytes that are 0x7F followed by 0x45,
-	0x4c, and 0x46 which on ASCII translation yields the three letters E, L, and F. 
+	0x4c, and 0x46 which on ASCII translation yields the three letters E, L, and F.
 	ELF_MAGIC = 0x464C457FU : read LSB to MSB */
 
 	if (fileHeader->e_magic != ELF_MAGIC)
@@ -123,30 +118,31 @@ copy_guest_kern_gpa(envid_t guest, char *fname)
 		return -E_NOT_EXEC; // not a suitable binary ELF was not found in header
 	}
 
-	struct Proghdr *prgHdr = (struct Proghdr *)(fileData + fileHeader->e_phoff); //add offset to data and move tp prgHdr 
-	struct Proghdr *endPrgHdr = prgHdr + fileHeader->e_phnum; // add more to prghdr, 32 bit offset
-	
-	//prgHdr is already initialized
-	for (; prgHdr < endPrgHdr; prgHdr++)
+	struct Proghdr *prgHdr = (struct Proghdr *)(fileData + fileHeader->e_phoff); // add offset to data and move tp prgHdr
+	struct Proghdr *endPrgHdr = prgHdr + fileHeader->e_phnum;					 // add more to prghdr, 32 bit offset
+
+	// prgHdr is already initialized
+	while (prgHdr < endPrgHdr)
 	{
 		/*The ELF header gets allocated by means of the macros defined in elf.h file. The constant
-		*ELF PROG LOAD is carrying the value 1. This is actually the value for p type field of the
-		*Proghdr structure. The value of 1 in particular means that the segment type is PT LOAD
-		*/
+		 *ELF PROG LOAD is carrying the value 1. This is actually the value for p type field of the
+		 *Proghdr structure. The value of 1 in particular means that the segment type is PT LOAD
+		 */
 
 		if (prgHdr->p_type == ELF_PROG_LOAD)
 		{
 			mapStatus = map_in_guest(guest, prgHdr->p_pa,
 									 prgHdr->p_memsz, fileDesc,
-									prgHdr->p_filesz, prgHdr->p_offset);
-		if (mapStatus < 0)
+									 prgHdr->p_filesz, prgHdr->p_offset);
+			if (mapStatus < 0)
 			{
 				close(fileDesc);
-				return -E_NO_SYS; //Unimplemented
+				return -E_NO_SYS; // Unimplemented
 			}
 		}
+		prgHdr++;
 	}
-	close(fileDesc);	//closure upon successful read
+	close(fileDesc); // closure upon successful read
 	return mapStatus;
 }
 

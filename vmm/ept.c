@@ -50,45 +50,28 @@ static int ept_lookup_gpa(epte_t *eptrt, void *gpa,
 						  int create, epte_t **epte_out)
 {
 	/* Your code here */
-	pte_t *pgTableEntry = NULL;
+	pte_t *pgTableEntry = (pte_t *)0;
 	// type should be epte_t? doubt..
 
 	/* ept root entry for a given guest physical address*/
-	if (eptrt == NULL)
+	if (eptrt == (epte_t *)0)
 		return -E_INVAL;
 
 	/*if non-null, walk the pages! pmap.c has the method for walk*/
+	// note type-cast the first param
 	pgTableEntry = pml4e_walk((pml4e_t *)eptrt, gpa, create);
 
 	/*check if page table entries are missing*/
 	if (pgTableEntry == NULL)
 	{
 		if (create == 0)
-			return -E_NO_ENT;
+			return -E_NO_ENT; // entries missing
 		else
-			return -E_NO_MEM; //alloc fails here
+			return -E_NO_MEM; // alloc fails here
 	}
 
-	/* reconfigure the permission as in
-	 the hint to set ept entries to __EPTE_FULL */
-
-	pml4e_t *pMapl4Entry = &eptrt[PML4(gpa)];
-
-	pdpe_t *pdPtrEntry = (pdpe_t *)KADDR(PTE_ADDR(*pMapl4Entry));
-	pdPtrEntry = &pdPtrEntry[PDPE(gpa)];
-
-	pde_t *pdEntry = (pde_t *)KADDR(PTE_ADDR(*pdPtrEntry));
-	pdEntry = &pdEntry[PDX(gpa)];
-
-	/*change permissions with this all-rounder Macro 
-	#define __EPTE_FULL	(__EPTE_READ | __EPTE_WRITE | __EPTE_EXEC)*/
-
-	*pMapl4Entry = *pMapl4Entry | __EPTE_FULL;
-	*pdPtrEntry = *pdPtrEntry | __EPTE_FULL;
-	*pdEntry = *pdEntry | __EPTE_FULL;
-
-	if (epte_out) //addrress of pte is received here
-		*epte_out = (epte_t *)pgTableEntry; //cast
+	if (epte_out)							// addrress of pte is received here
+		*epte_out = (epte_t *)pgTableEntry; // cast
 
 	return 0; // success
 }
@@ -185,29 +168,29 @@ int ept_map_hva2gpa(epte_t *eptrt, void *hva, void *gpa, int perm,
 {
 	/* Your code here */
 	epte_t *traverseEPT;
-	physaddr_t hostPhyAddr = 0;
+	physaddr_t hostPhyAddr = (physaddr_t)0x00;
 
 	int eptLookupStatus = -1;
-	//compute host physical from host virtual
+	// compute host physical from host virtual
 	hostPhyAddr = PADDR(hva);
 
 	/* invoke a lookup with ept root, guest's phy Addr
-	* 1 for create, and address of the to be traversed ept table entry
-	*/
-	eptLookupStatus = ept_lookup_gpa(eptrt, gpa, 1, &traverseEPT);
-	
+	 * 1 for create, and address of the to be traversed ept table entry
+	 */
+	eptLookupStatus = ept_lookup_gpa(eptrt, gpa, 1, (epte_t **)&(traverseEPT)); //cast param
+
 	if (eptLookupStatus == 0)
 	{
 		if (*traverseEPT && overwrite == 0)
 			return -E_INVAL;
 
 		else
-		{	//as directed in the hint
-			*traverseEPT = perm | (pte_t)hostPhyAddr  | __EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT;
+		{ // as directed in the hint
+			*traverseEPT = perm | (pte_t)hostPhyAddr | __EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT;
 		}
-		return 0; //success
+		return 0; // success
 	}
-	return -E_INVAL; //failed
+	return -E_INVAL; // invalid
 }
 
 int ept_alloc_static(epte_t *eptrt, struct VmxGuestInfo *ginfo)

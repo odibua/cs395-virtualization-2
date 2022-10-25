@@ -466,15 +466,16 @@ sys_ept_map(envid_t srcenvid, void *srcva,
 			envid_t guest, void *guest_pa, int perm)
 {
 	// struct ptrs declarations for the 2 environments
-	struct Env *originEnvt = ((void *)0);
-	struct Env *guestEnvt = ((void *)0);
+	struct Env *originEnvt = (struct Env *)0;
+	struct Env *guestEnvt = (struct Env *)0;
 
 	// pointers to page table entries and host VA
-	pte_t *pgTableEntries = ((void *)0);
-	pte_t *hostVirtualAddr = ((void *)0);
+	pte_t *pgTableEntries = (pte_t *)0;
+	pte_t *hostVirtualAddr = (pte_t *)0;
 
-	struct PageInfo *retPage = ((void *)0);
-	// ret on err
+	struct PageInfo *retPage = (struct PageInfo *)0;
+	
+	// ret on err - negatives are usuallly error : default
 	int sourceCode = -1;
 	int guestCode = -1;
 
@@ -506,7 +507,7 @@ sys_ept_map(envid_t srcenvid, void *srcva,
 	if (retPage == 0)
 		return -E_INVAL;
 
-	/* permission is okay?*/
+	/* permission is okay i.e. 1?*/
 	/*if (perm & PTE_W), but srcva is read-only in srcenvid's
 		address space i.e. perm is 0.*/
 	if ((perm == 0) || ((perm & __EPTE_WRITE) && (!(*pgTableEntries & PTE_W)))) //WRITABLE
