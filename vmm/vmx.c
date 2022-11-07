@@ -468,7 +468,7 @@ void vmcs_dump_cpu()
 void vmexit()
 {
 	register int *foo asm ("cr3");
-	cprintf("CR3 Before Exit \n", foo)
+	cprintf("CR3 Before Exit \n", foo);
 	int exit_reason = -1;
 	bool exit_handled = false;
 	static uint32_t host_vector;
@@ -517,13 +517,13 @@ void vmexit()
 	{
 		cprintf("Unhandled VMEXIT, aborting guest.\n");
 		register int *foo2 asm ("cr3");
-		cprintf("CR3 After Exit Before Dump \n", foo)
+		cprintf("CR3 After Exit Before Dump \n", foo);
 		vmcs_dump_cpu();
 		register int *foo3 asm ("cr3");
-		cprintf("CR3 After Dump \n", foo)
+		cprintf("CR3 After Dump \n", foo);
 		env_destroy(curenv);
 		register int *foo3 asm ("cr3");
-		cprintf("CR3 After Destroy \n", foo)
+		cprintf("CR3 After Destroy \n", foo);
 	}
 
 	sched_yield();
