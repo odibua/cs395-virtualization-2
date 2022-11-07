@@ -467,16 +467,18 @@ void vmcs_dump_cpu()
 
 void vmexit()
 {
-	register int *foo asm ("cr3");
-	cprintf("CR3 Before Exit \n", foo);
 	int exit_reason = -1;
+
+
 	bool exit_handled = false;
 	static uint32_t host_vector;
 	// Get the reason for VMEXIT from the VMCS.
-	// Your code here.
+	uint32_t exit_reason_temp;
+	exit_reason_temp = vmcs_read32(VMCS_32BIT_VMEXIT_REASON);
+	exit_reason = ((exit_reason_temp << 16) & 0xFFFF0000) >> 16;
 
-	// cprintf( "---VMEXIT Reason: %d---\n", exit_reason );
-	/* vmcs_dump_cpu(); */
+	cprintf( "---VMEXIT Reason: %d---\n", exit_reason );
+	vmcs_dump_cpu();
 
 	switch (exit_reason & EXIT_REASON_MASK)
 	{
@@ -516,14 +518,8 @@ void vmexit()
 	if (!exit_handled)
 	{
 		cprintf("Unhandled VMEXIT, aborting guest.\n");
-		register int *foo2 asm ("cr3");
-		cprintf("CR3 After Exit Before Dump \n", foo);
 		vmcs_dump_cpu();
-		register int *foo3 asm ("cr3");
-		cprintf("CR3 After Dump \n", foo);
 		env_destroy(curenv);
-		register int *foo4 asm ("cr3");
-		cprintf("CR3 After Destroy \n", foo);
 	}
 
 	sched_yield();
