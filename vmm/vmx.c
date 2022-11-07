@@ -522,7 +522,7 @@ void vmexit()
 		register int *foo3 asm ("cr3");
 		cprintf("CR3 After Dump \n", foo);
 		env_destroy(curenv);
-		register int *foo3 asm ("cr3");
+		register int *foo4 asm ("cr3");
 		cprintf("CR3 After Destroy \n", foo);
 	}
 
