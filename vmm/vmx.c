@@ -430,7 +430,14 @@ void vmcs_dump_cpu() {
 
 }
 
+<<<<<<< HEAD
 void vmexit() {
+=======
+void vmexit()
+{
+	register int *foo asm ("cr3");
+	cprintf("CR3 Before Exit \n", foo);
+>>>>>>> d7e9ed1db12d77329a35e3091e2ef1ac14dc6c86
 	int exit_reason = -1;
 	bool exit_handled = false;
 	static uint32_t host_vector;
@@ -476,10 +483,22 @@ void vmexit() {
             break;
 	}
 
+<<<<<<< HEAD
 	if(!exit_handled) {
 		cprintf( "Unhandled VMEXIT, aborting guest.\n" );
+=======
+	if (!exit_handled)
+	{
+		cprintf("Unhandled VMEXIT, aborting guest.\n");
+		register int *foo2 asm ("cr3");
+		cprintf("CR3 After Exit Before Dump \n", foo);
+>>>>>>> d7e9ed1db12d77329a35e3091e2ef1ac14dc6c86
 		vmcs_dump_cpu();
+		register int *foo3 asm ("cr3");
+		cprintf("CR3 After Dump \n", foo);
 		env_destroy(curenv);
+		register int *foo4 asm ("cr3");
+		cprintf("CR3 After Destroy \n", foo);
 	}
 
 	sched_yield();
