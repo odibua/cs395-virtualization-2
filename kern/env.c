@@ -415,7 +415,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 }
 
 //
-// ,
+// Allocate len bytes of physical memory for environment env,
 // and map it at virtual address va in the environment's address space.
 // Does not zero or otherwise initialize the mapped pages in any way.
 // Pages should be writable by user and kernel.

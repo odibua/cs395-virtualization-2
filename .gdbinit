@@ -24,8 +24,8 @@ define hook-stop
 end
 
 #initially set architecture to x86_64
-echo + target remote localhost:25000\n
-target remote localhost:25000
+echo + target remote localhost:26000\n
+target remote localhost:26000
 
 # If this fails, it's probably because your GDB doesn't support ELF.
 # Look at the tools page at

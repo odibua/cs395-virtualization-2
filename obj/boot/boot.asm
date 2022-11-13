@@ -152,7 +152,10 @@ done:
   # Jump to next instruction, but in 32-bit code segment.
   # Switches processor into 32-bit mode.
   ljmp    $PROT_MODE_CSEG, $protcseg
-    7c97:	ea 9c 7c 08 00 66 b8 	ljmp   $0xb866,$0x87c9c
+    7c97:	ea                   	.byte 0xea
+    7c98:	9c                   	pushf  
+    7c99:	7c 08                	jl     7ca3 <protcseg+0x7>
+	...
 
 00007c9c <protcseg>:
 
@@ -195,11 +198,17 @@ spin:
     7cc5:	ff 00                	incl   (%eax)
     7cc7:	00 00                	add    %al,(%eax)
     7cc9:	9a cf 00 ff ff 00 00 	lcall  $0x0,$0xffff00cf
-    7cd0:	00 92 cf 00 17 00    	add    %dl,0x1700cf(%edx)
+    7cd0:	00                   	.byte 0x0
+    7cd1:	92                   	xchg   %eax,%edx
+    7cd2:	cf                   	iret   
+	...
 
 00007cd4 <gdtdesc>:
     7cd4:	17                   	pop    %ss
-    7cd5:	00 bc 7c 00 00 55 ba 	add    %bh,-0x45ab0000(%esp,%edi,2)
+    7cd5:	00                   	.byte 0x0
+    7cd6:	bc                   	.byte 0xbc
+    7cd7:	7c 00                	jl     7cd9 <gdtdesc+0x5>
+	...
 
 00007cda <waitdisk>:
     }
