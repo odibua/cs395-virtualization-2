@@ -43,10 +43,7 @@ movl    %eax, %cr0
 # Jump to next instruction, but in 32-bit code segment.
 # Switches processor into 32-bit mode.
 ljmp    $PROT_MODE_CSEG, $protcseg
-    7019:	ea                   	.byte 0xea
-    701a:	1e                   	push   %ds
-    701b:	70 08                	jo     7025 <protcseg+0x7>
-	...
+    7019:	ea 1e 70 08 00 66 b8 	ljmp   $0xb866,$0x8701e
 
 0000701e <protcseg>:
 
@@ -85,10 +82,7 @@ jmp spin
     7041:	ff 00                	incl   (%eax)
     7043:	00 00                	add    %al,(%eax)
     7045:	9a cf 00 ff ff 00 00 	lcall  $0x0,$0xffff00cf
-    704c:	00                   	.byte 0x0
-    704d:	92                   	xchg   %eax,%edx
-    704e:	cf                   	iret   
-	...
+    704c:	00 92 cf 00 17 00    	add    %dl,0x1700cf(%edx)
 
 00007050 <gdtdesc>:
     7050:	17                   	pop    %ss
