@@ -306,7 +306,7 @@ QEMU appears to already be running.  Please exit it if possible or use
             self.proc.terminate()
 
 class GDBClient(object):
-    def __init__(self, port, timeout=300):
+    def __init__(self, port, timeout=15):
         start = time.time()
         while True:
             self.sock = socket.socket()
@@ -386,7 +386,7 @@ class Runner():
         should be a list of additional arguments to pass to make.  The
         timeout argument bounds how long to run before returning."""
 
-        def run_qemu_kw(target_base="qemu", make_args=[], timeout=400):
+        def run_qemu_kw(target_base="qemu", make_args=[], timeout=300):
             return target_base, make_args, timeout
         target_base, make_args, timeout = run_qemu_kw(**kw)
 
