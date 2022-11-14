@@ -430,14 +430,10 @@ void vmcs_dump_cpu() {
 
 }
 
-<<<<<<< HEAD
+
 void vmexit() {
-=======
-void vmexit()
-{
 	register int *foo asm ("cr3");
 	cprintf("CR3 Before Exit \n", foo);
->>>>>>> d7e9ed1db12d77329a35e3091e2ef1ac14dc6c86
 	int exit_reason = -1;
 	bool exit_handled = false;
 	static uint32_t host_vector;

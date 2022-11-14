@@ -243,7 +243,14 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 	case VMX_VMCALL_MBMAP:
         /* Hint: */
 		// Craft a multiboot (e820) memory map for the guest.
-		//
+		// Set flags that will allow size and address fields to exists
+			mbinfo->flags = mbinfo-> flags; || 0x1; // flag[0] for mem_lower and mem_upper
+			mbinfo->flags = mbinfo-> flags; || 0x1 << 3;// flags[3] for mods_addr
+			mbinfo->flags = mbinfo-> flags; || 0x1 << 6;// flags[6] for mmap_addr
+			mbinfo->mem_lower = 0;
+			mbinfo->mem_upper = 
+
+
 		// Create three  memory mapping segments: 640k of low mem, the I/O hole (unusable), and 
 		//   high memory (phys_size - 1024k).
 		//
