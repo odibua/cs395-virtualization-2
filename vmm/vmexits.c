@@ -240,6 +240,7 @@ bool handle_cpuid(struct Trapframe *tf, struct VmxGuestInfo *ginfo)
 	uint32_t bitMask = 0x20;
 	uint32_t dummyInfo = (uint32_t)tf->tf_regs.reg_rax;
 	uint32_t eaxptr, ebxptr, ecxptr, edxptr;
+	cprintf("Random 1");
 	cpuid(dummyInfo, &eaxptr, &ebxptr, &ecxptr, &edxptr);
 
 	// 2. if set to 1, removal of bit by shofting
@@ -247,7 +248,7 @@ bool handle_cpuid(struct Trapframe *tf, struct VmxGuestInfo *ginfo)
 	{
 		ecxptr = ecxptr & ~bitMask; // 1<<5, 32 in decimal, 0x20 in hex. Removal of 5th bit aka VMX not supported
 	}
-
+	cprintf("Random 2");
 	// pushregs are all 64 bit, needs casting
 	tf->tf_regs.reg_rax = (uint64_t)eaxptr;
 	tf->tf_regs.reg_rbx = (uint64_t)ebxptr;
@@ -257,6 +258,7 @@ bool handle_cpuid(struct Trapframe *tf, struct VmxGuestInfo *ginfo)
 	// 3. incremement prog counter in the trap frame without hardcoding length of cpuid inst
 	tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
 	// exit is handled properly
+	cprintf("Random 3");
 	return true;
 	// lines below were enabled in solution of lab 2 instead
 	//  panic("handle_cpuid is not impemented\n");
@@ -399,6 +401,7 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 		 * Hint: The solution does not hard-code the length of the vmcall instruction.
 		 */
 		/* Your code here */
+		tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
 	}
 	return handled;
 }
