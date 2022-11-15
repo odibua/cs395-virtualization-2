@@ -329,7 +329,7 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 		mmapSegment[2].base_addr_low = (uint32_t)EXTPHYSMEM;
 		mmapSegment[2].base_addr_high = (uint32_t)0x0;
 		mmapSegment[2].length_low = (uint32_t)(gInfo->phys_sz - EXTPHYSMEM) & (0xFFFFFFFF);			 // the final 32 bits only
-		mmapSegment[2].length_high = (uint32_t)((gInfo->phys_sz - EXTPHYSMEM) >> 32) & (0xFFFFFFFF); // left shift to move top 32 bits
+		mmapSegment[2].length_high = (uint32_t)((gInfo->phys_sz - EXTPHYSMEM) << 32) & (0xFFFFFFFF); // left shift to move top 32 bits
 		mmapSegment[2].type = (uint32_t)MB_TYPE_USABLE;
 
 		// Copy the mbinfo and memory_map_t (segment descriptions) into the guest page
