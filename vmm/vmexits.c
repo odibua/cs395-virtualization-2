@@ -240,16 +240,15 @@ bool handle_cpuid(struct Trapframe *tf, struct VmxGuestInfo *ginfo)
 	uint32_t bitMask = 0x20;
 	uint32_t dummyInfo = (uint32_t)tf->tf_regs.reg_rax;
 	uint32_t eaxptr, ebxptr, ecxptr, edxptr;
-	cprintf("Random 1");
 	cpuid(dummyInfo, &eaxptr, &ebxptr, &ecxptr, &edxptr);
 
-	// 2. if set to 1, removal of bit by shofting
-	if (dummyInfo == (uint32_t)0x01)
+	// 2. if set to 1, removal of bit by shifting
+	if (dummyInfo == 0x01)
 	{
-		ecxptr = ecxptr & ~bitMask; // 1<<5, 32 in decimal, 0x20 in hex. Removal of 5th bit aka VMX not supported
+		ecxptr = ecxptr & ~(bitMask); // 1<<5, 32 in decimal, 0x20 in hex. bit removal aka VMX not supported
 	}
-	cprintf("Random 2");
-	// pushregs are all 64 bit, needs casting
+
+	// pushregs are all 64 bit, needs casting, we do it anyway
 	tf->tf_regs.reg_rax = (uint64_t)eaxptr;
 	tf->tf_regs.reg_rbx = (uint64_t)ebxptr;
 	tf->tf_regs.reg_rcx = (uint64_t)ecxptr;
@@ -258,7 +257,6 @@ bool handle_cpuid(struct Trapframe *tf, struct VmxGuestInfo *ginfo)
 	// 3. incremement prog counter in the trap frame without hardcoding length of cpuid inst
 	tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
 	// exit is handled properly
-	cprintf("Random 3");
 	return true;
 	// lines below were enabled in solution of lab 2 instead
 	//  panic("handle_cpuid is not impemented\n");
@@ -285,7 +283,6 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 	uint32_t val;
 	// phys address of the multiboot map in the guest.
 	uint64_t multiboot_map_addr = 0x6000;
-
 	// declarations we added
 	// store host VA, three memory map segments - low and high and I/o hole
 
@@ -307,7 +304,6 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 		// Copy the mbinfo and memory_map_t (segment descriptions) into the guest page, and return
 		//   a pointer to this region in rbx (as a guest physical address).
 		/* Your code here */
-
 		// 1. LOW MEMORY SEGMENT - 640k of low mem,  the offset 0 is base_addr_low
 		mmapSegment[0].size = (uint32_t)20;
 		mmapSegment[0].base_addr_low = (uint32_t)0x0;	 // base low addr - lower 32 bits
@@ -329,7 +325,7 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 		mmapSegment[2].base_addr_low = (uint32_t)EXTPHYSMEM;
 		mmapSegment[2].base_addr_high = (uint32_t)0x0;
 		mmapSegment[2].length_low = (uint32_t)(gInfo->phys_sz - EXTPHYSMEM) & (0xFFFFFFFF);			 // the final 32 bits only
-		mmapSegment[2].length_high = (uint32_t)((gInfo->phys_sz - EXTPHYSMEM) << 32) & (0xFFFFFFFF); // left shift to move top 32 bits
+		mmapSegment[2].length_high = (uint32_t)((gInfo->phys_sz - EXTPHYSMEM) >> 32) & (0xFFFFFFFF); // left shift to move top 32 bits
 		mmapSegment[2].type = (uint32_t)MB_TYPE_USABLE;
 
 		// Copy the mbinfo and memory_map_t (segment descriptions) into the guest page
@@ -337,7 +333,7 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 		mbinfo.mmap_length = (uint32_t)sizeof(mmapSegment);
 		mbinfo.mmap_addr = (uint32_t)(multiboot_map_addr + sizeof(multiboot_info_t)); // 0X6000 + STRUCT
 
-		// insert page and inc ppref
+		// insert page and inc ppref, see pmap.h
 		newPage = page_alloc(ALLOC_ZERO);
 		if (newPage == NULL)
 		{
@@ -355,8 +351,7 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 		ept_map_hva2gpa(eptrt, (void *)host_va, (void *)multiboot_map_addr, __EPTE_FULL, 1);
 		tf->tf_regs.reg_rbx = (uint64_t)multiboot_map_addr;
 
-		//comment me
-		cprintf("e820 map hypercall is implemented\n");
+		// change status, move ptr in if handled? below
 		handled = true;
 		break;
 
@@ -401,6 +396,8 @@ bool handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *e
 		 * Hint: The solution does not hard-code the length of the vmcall instruction.
 		 */
 		/* Your code here */
+
+		// dynamc length of vmcall instr?
 		tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
 	}
 	return handled;
