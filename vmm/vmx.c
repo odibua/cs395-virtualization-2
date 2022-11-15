@@ -442,6 +442,7 @@ void vmexit() {
 	
 	//returns a 32 bit exit reason from Read only bits/fields 
 	exit_reason = vmcs_read32(VMCS_32BIT_VMEXIT_REASON);
+	exit_reason = ((exit_reason << 16) & 0xFFFF0000) >> 16;
 	//disable me later
 	cprintf( "---VMEXIT Reason: %x---\n", exit_reason );
 
