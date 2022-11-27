@@ -324,6 +324,9 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     /*  Hint: check if environment is ENV_TYPE_GUEST or not, and if the source or destination 
      *  is using normal page, use page_insert. Use ept_page_insert() wherever possible. */
     /* Your code here */
+    // if e->env_type GUEST and destVA is below UTOP insert page in hotst page table
+    // elif e->env_type GUESt and srcva is below UTOP insert page in ept
+    // END
 
     if (srcva < (void*) UTOP && e->env_ipc_dstva < (void*) UTOP) {
         if ((~perm & (PTE_U|PTE_P)) || (perm & ~PTE_SYSCALL)) {
@@ -358,6 +361,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     e->env_ipc_value = value;
     e->env_tf.tf_regs.reg_rax = 0;
     e->env_status = ENV_RUNNABLE;
+    // END: If dest enviornment is guest set rsi register of trapframe with value
     return 0;
 }
 

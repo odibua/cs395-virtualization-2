@@ -166,6 +166,13 @@ void free_guest_mem(epte_t* eptrt) {
 //
 int ept_page_insert(epte_t* eptrt, struct PageInfo* pp, void* gpa, int perm) {
     /* Your code here */
+    // Create a *pte to store the epte page entry for the gpa
+    // call ept_lookup_gpa
+    // Check if page table entry is present with epte_present
+    // Get Page that is present using pa2page
+    // Get hva using ept_gpa2hva
+    // Use page_insert function
+    //  if successful, decrement old reference count for old mapping, increment new page reference count
     return 0;
 }
 
