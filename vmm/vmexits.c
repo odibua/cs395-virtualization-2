@@ -366,11 +366,31 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
         //  Then you should call sys_ipc_try_send()
 		/* Your code here */
 		// 1) Check trapfram registers based on hint in Lab 
-        // 2) Return correct errof if the host is not as expected
+		envid_t to_env = tf->tf_regs.reg_rbx;
+		uint32_t val =  tf->tf_regs.reg_rcx;
+		physaddr_t gpa = tf->tf_regs.reg_rdx;
+		int perm = tf->tf_regs.reg_rsi; 
+
+        // 2) Return correct error if the host is not as expected
+		if (to_env != VMX_HOST_FS_ENV || curenv->env_type != ENV_TYPE_GUEST) {
+			return -E_INVAL;
+		}
 		// 3) Iterate through all present environments and set to_env argument
 		//    of sys_ipc_try_send() to this
+		int env_idx;
+		for (env_idx = 0; env_idx < NENV; env_idx++) {
+			if (envs[env_idx].env_type == ENV_TYPE_FS) {
+				to_env = envs[env_idx].env_id;
+			}
+			
+		}
 		// 4) Convert gva to hva with ept_gpa2hva
+		void* hva = NULL;
+		ept_gpa2hva(&eptrt, &gpa, &hva);
+
 		// 5) make sys_ipc_try_send call
+		sys_ipc_try_send(to_env, val, &hva, perm);
+		handled = true;
 		break;
 
 	case VMX_VMCALL_IPCRECV:
@@ -379,8 +399,12 @@ handle_vmcall(struct Trapframe *tf, struct VmxGuestInfo *gInfo, uint64_t *eptrt)
 		// you should go ahead and increment rip before this call.
 		/* Your code here */
 		// 1) Increment program counter (rip register)
+		tf->tf_rip += vmcs_read32(VMCS_32BIT_VMEXIT_INSTRUCTION_LENGTH);
 		// 2) Call sys_ipc_recv
+		physaddr_t gpa = tf->tf_regs.reg_rbx;
+		sys_ipc_recv(gpa);
 		break;
+		
 	case VMX_VMCALL_LAPICEOI:
 		lapic_eoi();
 		handled = true;

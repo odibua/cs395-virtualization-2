@@ -324,8 +324,15 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     /*  Hint: check if environment is ENV_TYPE_GUEST or not, and if the source or destination 
      *  is using normal page, use page_insert. Use ept_page_insert() wherever possible. */
     /* Your code here */
+
     // if e->env_type GUEST and destVA is below UTOP insert page in hotst page table
+    struct Env *dest_e = &envs[ENVX(envid)];
+    if (curenv->env_type == ENV_TYPE_GUEST && curenv->env_ipc_dstva < (void*) UTOP) {
+        page_insert(&curenv->env_pml4e, &pp, &srcva, perm);
+    } else if (dest_e->env_type == ENV_TYPE_GUEST && srcva < (void*) UTOP) {
     // elif e->env_type GUESt and srcva is below UTOP insert page in ept
+        ept_page_insert(dest_e->env_pml4e, &pp, &srcva, perm);
+    }
     // END
 
     if (srcva < (void*) UTOP && e->env_ipc_dstva < (void*) UTOP) {
@@ -362,6 +369,9 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     e->env_tf.tf_regs.reg_rax = 0;
     e->env_status = ENV_RUNNABLE;
     // END: If dest enviornment is guest set rsi register of trapframe with value
+    if (dest_e->env_type == ENV_TYPE_GUEST) {
+        dest_e->env_tf.tf_regs.reg_rsi = value;
+    }
     return 0;
 }
 
