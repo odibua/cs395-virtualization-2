@@ -177,7 +177,7 @@ int ept_page_insert(epte_t* eptrt, struct PageInfo* pp, void* gpa, int perm) {
 
     // Get Page that is present using pa2page
     if (ept_ret) {
-        struct PageInfo* old_pp = pa2page(gpa);
+        struct PageInfo* old_pp = pa2page(PTE_ADDR(*pte));
         old_pp->pp_ref = old_pp->pp_ref - 1;
     }
 
