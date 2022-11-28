@@ -324,15 +324,6 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     /*  Hint: check if environment is ENV_TYPE_GUEST or not, and if the source or destination 
      *  is using normal page, use page_insert. Use ept_page_insert() wherever possible. */
     /* Your code here */
-
-    // if e->env_type GUEST and destVA is below UTOP insert page in hotst page table
-    struct Env *dest_e = &envs[ENVX(envid)];
-    if (curenv->env_type == ENV_TYPE_GUEST && curenv->env_ipc_dstva < (void*) UTOP) {
-        page_insert(&curenv->env_pml4e, &pp, &srcva, perm);
-    } else if (dest_e->env_type == ENV_TYPE_GUEST && srcva < (void*) UTOP) {
-    // elif e->env_type GUESt and srcva is below UTOP insert page in ept
-        ept_page_insert(dest_e->env_pml4e, &pp, &srcva, perm);
-    }
     // END
 
     if (srcva < (void*) UTOP && e->env_ipc_dstva < (void*) UTOP) {
@@ -351,8 +342,14 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
             cprintf("[%08x] attempt to send read-only page read-write in sys_ipc_try_send\n", curenv->env_id);
             return -E_INVAL;
         }
-
-        r = page_insert(e->env_pml4e, pp, e->env_ipc_dstva, perm);
+        // if e->env_type GUEST and destVA is below UTOP insert page in hotst page table
+        if (curenv->env_type == ENV_TYPE_GUEST && e->env_ipc_dstva < (void*) UTOP) {
+            r = page_insert(e->env_pml4e, pp,  e->env_ipc_dstva, perm);
+        } else if (e->env_type == ENV_TYPE_GUEST && srcva < (void*) UTOP) {
+        // elif e->env_type GUESt and srcva is below UTOP insert page in ept
+            r = ept_page_insert(e->env_pml4e, pp, e->env_ipc_dstva, perm);
+        }
+        // r = page_insert(e->env_pml4e, pp, e->env_ipc_dstva, perm);
         if (r < 0) {
             cprintf("[%08x] page_insert %08x failed in sys_ipc_try_send (%e)\n", curenv->env_id, srcva, r);
             return r;
@@ -369,8 +366,8 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     e->env_tf.tf_regs.reg_rax = 0;
     e->env_status = ENV_RUNNABLE;
     // END: If dest enviornment is guest set rsi register of trapframe with value
-    if (dest_e->env_type == ENV_TYPE_GUEST) {
-        dest_e->env_tf.tf_regs.reg_rsi = value;
+    if (e->env_type == ENV_TYPE_GUEST) {
+        e->env_tf.tf_regs.reg_rsi = value;
     }
     return 0;
 }
