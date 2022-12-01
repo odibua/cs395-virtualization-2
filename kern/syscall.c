@@ -186,13 +186,14 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
     if ((r = envid2env(envid, &e, 1)) < 0)
         return r;
-    if ((~perm & (PTE_U|PTE_P)) || (perm & ~PTE_SYSCALL))
+    if ((~perm & (PTE_U | PTE_P)) || (perm & ~PTE_SYSCALL))
         return -E_INVAL;
-    if (va >= (void*) UTOP)
+    if (va >= (void *)UTOP)
         return -E_INVAL;
     if (!(pp = page_alloc(ALLOC_ZERO)))
         return -E_NO_MEM;
-    if ((r = page_insert(e->env_pml4e, pp, va, perm)) < 0) {
+    if ((r = page_insert(e->env_pml4e, pp, va, perm)) < 0)
+    {
         page_free(pp);
         return r;
     }
@@ -217,22 +218,21 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 //	-E_NO_MEM if there's no memory to allocate any necessary page tables.
 static int
 sys_page_map(envid_t srcenvid, void *srcva,
-         envid_t dstenvid, void *dstva, int perm)
+             envid_t dstenvid, void *dstva, int perm)
 {
     int r;
     struct Env *es, *ed;
     struct PageInfo *pp;
     pte_t *ppte;
 
-    if (srcva >= (void*) UTOP || dstva >= (void*) UTOP)
+    if (srcva >= (void *)UTOP || dstva >= (void *)UTOP)
         return -E_INVAL;
     if (srcva != ROUNDDOWN(srcva, PGSIZE) || dstva != ROUNDDOWN(dstva, PGSIZE))
         return -E_INVAL;
 
-    if ((r = envid2env(srcenvid, &es, 1)) < 0
-            || (r = envid2env(dstenvid, &ed, 1)) < 0)
+    if ((r = envid2env(srcenvid, &es, 1)) < 0 || (r = envid2env(dstenvid, &ed, 1)) < 0)
         return r;
-    if ((~perm & (PTE_U|PTE_P)) || (perm & ~PTE_SYSCALL))
+    if ((~perm & (PTE_U | PTE_P)) || (perm & ~PTE_SYSCALL))
         return -E_INVAL;
     if ((pp = page_lookup(es->env_pml4e, srcva, &ppte)) == 0)
         return -E_INVAL;
@@ -258,7 +258,7 @@ sys_page_unmap(envid_t envid, void *va)
 
     if ((r = envid2env(envid, &e, 1)) < 0)
         return r;
-    if (va >= (void*) UTOP || PGOFF(va))
+    if (va >= (void *)UTOP || PGOFF(va))
         return -E_INVAL;
     page_remove(e->env_pml4e, va);
     return 0;
@@ -316,47 +316,87 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     pte_t *ppte;
     if ((r = envid2env(envid, &e, 0)) < 0)
         return r;
-    if (!e->env_ipc_recving) {
-        /* cprintf("[%08x] not recieving!\n", e->env_id); */
+    if (!e->env_ipc_recving)
+    { /* cprintf("[%08x] not recieving!\n", e->env_id); */
         return -E_IPC_NOT_RECV;
     }
-
-    /*  Hint: check if environment is ENV_TYPE_GUEST or not, and if the source or destination 
+    /*  Hint: check if environment is ENV_TYPE_GUEST or not, and if the source or destination
      *  is using normal page, use page_insert. Use ept_page_insert() wherever possible. */
     /* Your code here */
-    // END
 
-    if (srcva < (void*) UTOP && e->env_ipc_dstva < (void*) UTOP) {
-        if ((~perm & (PTE_U|PTE_P)) || (perm & ~PTE_SYSCALL)) {
-            cprintf("[%08x] bad perm %x in sys_ipc_try_send\n", curenv->env_id, perm);
-            return -E_INVAL;
-        }
+    if (curenv->env_type == ENV_TYPE_GUEST && e->env_ipc_dstva < (void *)UTOP)
+    {
+        /*srcva should be assumed to be converted to a host virtual address (in
+        the kernel address range). You will need to add a special case to allow
+        accesses from ENV_TYPE_GUEST when srcva > UTOP.*/
 
-        pp = page_lookup(curenv->env_pml4e, srcva, &ppte);
-        if (pp == 0) {
-            cprintf("[%08x] page_lookup %08x failed in sys_ipc_try_send\n", curenv->env_id, srcva);
-            return -E_INVAL;
-        }
+        assert(srcva >= (void *)KERNBASE);
+        pp = pa2page(PADDR(srcva));
 
-        if ((perm & PTE_W) && !(*ppte & PTE_W)) {
-            cprintf("[%08x] attempt to send read-only page read-write in sys_ipc_try_send\n", curenv->env_id);
-            return -E_INVAL;
-        }
-        // if e->env_type GUEST and destVA is below UTOP insert page in hotst page table
-        if (curenv->env_type == ENV_TYPE_GUEST && e->env_ipc_dstva < (void*) UTOP) {
-            r = page_insert(e->env_pml4e, pp,  e->env_ipc_dstva, perm);
-        } else if (e->env_type == ENV_TYPE_GUEST && srcva < (void*) UTOP) {
-        // elif e->env_type GUESt and srcva is below UTOP insert page in ept
-            r = ept_page_insert(e->env_pml4e, pp, e->env_ipc_dstva, perm);
-        }
-        // r = page_insert(e->env_pml4e, pp, e->env_ipc_dstva, perm);
-        if (r < 0) {
-            cprintf("[%08x] page_insert %08x failed in sys_ipc_try_send (%e)\n", curenv->env_id, srcva, r);
+        r = page_insert(e->env_pml4e, pp, e->env_ipc_dstva, perm);
+        // check if insert succeeded
+        if (r < 0)
+        {
+            cprintf("Failure mode: Page insert failed\n");
             return r;
         }
 
         e->env_ipc_perm = perm;
-    } else {
+    }
+    else if (e->env_type == ENV_TYPE_GUEST && srcva < (void *)UTOP)
+    {
+        pp = page_lookup(curenv->env_pml4e, srcva, &ppte);
+        if (pp == 0)
+        {
+            cprintf("Failure mode: Page lookup failed\n");
+            return -E_INVAL;
+        }
+
+        if ((perm & PTE_W) && !(*ppte & PTE_W))
+        {
+            cprintf("Failure mode: Write permission\n");
+            return -E_INVAL;
+        }
+
+#ifndef VMM_GUEST
+        // guest calls a separate method for page insert - lab 4
+        r = ept_page_insert(e->env_pml4e, pp, e->env_ipc_dstva, __EPTE_FULL);
+#endif
+    }
+    // the following is the original block
+    else if (srcva < (void *)UTOP && e->env_ipc_dstva < (void *)UTOP)
+    {
+
+        if ((~perm & (PTE_U | PTE_P)) || (perm & ~PTE_SYSCALL))
+        {
+            cprintf("Failure mode: Permission denied!\n");
+            return -E_INVAL;
+        }
+
+        pp = page_lookup(curenv->env_pml4e, srcva, &ppte);
+        if (pp == 0)
+        {
+            cprintf("Failure mode: Page lookup failed\n");
+            return -E_INVAL;
+        }
+
+        if ((perm & PTE_W) && !(*ppte & PTE_W))
+        {
+            cprintf("Failure mode: Write perm denied\n");
+            return -E_INVAL;
+        }
+
+        r = page_insert(e->env_pml4e, pp, e->env_ipc_dstva, perm);
+        if (r < 0)
+        {
+            cprintf("Failure mode: Page insert failed\n");
+            return r;
+        }
+
+        e->env_ipc_perm = perm;
+    }
+    else
+    {
         e->env_ipc_perm = 0;
     }
 
@@ -365,10 +405,12 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
     e->env_ipc_value = value;
     e->env_tf.tf_regs.reg_rax = 0;
     e->env_status = ENV_RUNNABLE;
-    // END: If dest enviornment is guest set rsi register of trapframe with value
-    if (e->env_type == ENV_TYPE_GUEST) {
+
+    if (e->env_type == ENV_TYPE_GUEST)
+    {
         e->env_tf.tf_regs.reg_rsi = value;
     }
+
     return 0;
 }
 
@@ -396,12 +438,11 @@ sys_ipc_recv(void *dstva)
     return 0;
 }
 
-
 // Return the current time.
 static int
 sys_time_msec(void)
 {
-    return (int) time_msec();
+    return (int)time_msec();
 }
 
 static int
@@ -420,26 +461,30 @@ sys_net_receive(void *buf, size_t len)
 
 #ifndef VMM_GUEST
 static void
-sys_vmx_list_vms() {
+sys_vmx_list_vms()
+{
     vmx_list_vms();
 }
 
 static bool
-sys_vmx_sel_resume(int i) {
+sys_vmx_sel_resume(int i)
+{
     return vmx_sel_resume(i);
 }
 
 static int
-sys_vmx_get_vmdisk_number() {
+sys_vmx_get_vmdisk_number()
+{
     return vmx_get_vmdisk_number();
 }
 
 static void
-sys_vmx_incr_vmdisk_number() {
+sys_vmx_incr_vmdisk_number()
+{
     vmx_incr_vmdisk_number();
 }
 
-// Maps a page from the evnironment corresponding to envid into the guest vm 
+// Maps a page from the evnironment corresponding to envid into the guest vm
 // environments phys addr space.  Assuming the mapping is successful, this should
 // also increment the reference count of the mapped page.
 //
@@ -450,19 +495,19 @@ sys_vmx_incr_vmdisk_number() {
 //	-E_INVAL if srcva >= UTOP or srcva is not page-aligned,
 //		or guest_pa >= guest physical size or guest_pa is not page-aligned.
 //	-E_INVAL is srcva is not mapped in srcenvid's address space.
-//	-E_INVAL if perm is inappropriate 
+//	-E_INVAL if perm is inappropriate
 //	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
 //		address space.
-//	-E_NO_MEM if there's no memory to allocate any necessary page tables. 
+//	-E_NO_MEM if there's no memory to allocate any necessary page tables.
 //
-// Hint: Use ept_map_hva2gpa().  A guest environment uses 
+// Hint: Use ept_map_hva2gpa().  A guest environment uses
 //       env_pml4e to store the root of the extended page tables.
-//       This function is similar to sys_page_map(). It uses Extended Page Table 
-//       instead of the normal page table. 
-// 
+//       This function is similar to sys_page_map(). It uses Extended Page Table
+//       instead of the normal page table.
+//
 static int
 sys_ept_map(envid_t srcenvid, void *srcva,
-        envid_t guest, void* guest_pa, int perm)
+            envid_t guest, void *guest_pa, int perm)
 {
     int ret;
     struct Env *src_env, *guest_env;
@@ -470,38 +515,43 @@ sys_ept_map(envid_t srcenvid, void *srcva,
     pte_t *ppte;
 
     // check that the source virtual address is good
-    if (srcva >= (void*) UTOP || srcva != ROUNDDOWN(srcva, PGSIZE)) {
+    if (srcva >= (void *)UTOP || srcva != ROUNDDOWN(srcva, PGSIZE))
+    {
         return -E_INVAL;
     }
 
     // obtain src and guest env, returning error if either does not exist
     if ((ret = envid2env(srcenvid, &src_env, 1)) < 0 ||
-        (ret = envid2env(guest, &guest_env, 1)) < 0) {
-            return ret;
+        (ret = envid2env(guest, &guest_env, 1)) < 0)
+    {
+        return ret;
     }
     // check that the guest physical address is good
-    if (guest_pa >= (void*) guest_env->env_vmxinfo.phys_sz || guest_pa != ROUNDDOWN(guest_pa, PGSIZE)) {
+    if (guest_pa >= (void *)guest_env->env_vmxinfo.phys_sz || guest_pa != ROUNDDOWN(guest_pa, PGSIZE))
+    {
         return -E_INVAL;
     }
-    
-    // check that srcva is mapped in src_env's address space 
-    if ((pp = page_lookup(src_env->env_pml4e, srcva, &ppte)) == 0) {
+
+    // check that srcva is mapped in src_env's address space
+    if ((pp = page_lookup(src_env->env_pml4e, srcva, &ppte)) == 0)
+    {
         return -E_INVAL;
     }
 
     // check that the requested permissions are valid (some combination of read, write, and exec)
     if ((perm & __EPTE_FULL) == 0)
-		return -E_INVAL;
+        return -E_INVAL;
 
     // if perm requests write permission but we don't have write access to the page,
     // return an error
-	if ((perm & __EPTE_WRITE) && ((*ppte) & PTE_W) == 0)
-		return -E_INVAL;
+    if ((perm & __EPTE_WRITE) && ((*ppte) & PTE_W) == 0)
+        return -E_INVAL;
 
     // increment the page ref count. we'll undo this later if the mapping fails
     pp->pp_ref += 1;
     ret = ept_map_hva2gpa(guest_env->env_pml4e, page2kva(pp), guest_pa, perm, 0);
-    if (ret < 0) {
+    if (ret < 0)
+    {
         pp->pp_ref -= 1;
         return ret;
     }
@@ -510,16 +560,20 @@ sys_ept_map(envid_t srcenvid, void *srcva,
 }
 
 static envid_t
-    sys_env_mkguest(uint64_t gphysz, uint64_t gRIP) {
+sys_env_mkguest(uint64_t gphysz, uint64_t gRIP)
+{
     int r;
     struct Env *e;
 
     // Check if the processor has VMX support.
-    if ( !vmx_check_support() ) {
+    if (!vmx_check_support())
+    {
         return -E_NO_VMX;
-    } else if ( !vmx_check_ept() ) {
+    }
+    else if (!vmx_check_ept())
+    {
         return -E_NO_EPT;
-    } 
+    }
     if ((r = env_guest_alloc(&e, curenv->env_id)) < 0)
         return r;
     e->env_status = ENV_NOT_RUNNABLE;
@@ -527,15 +581,16 @@ static envid_t
     e->env_tf.tf_rip = gRIP;
     return e->env_id;
 }
-#endif //!VMM_GUEST
+#endif //! VMM_GUEST
 
 // Dispatches to the correct kernel function, passing the arguments.
 int64_t
 syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5)
 {
-    switch (syscallno) {
+    switch (syscallno)
+    {
     case SYS_cputs:
-        sys_cputs((const char*) a1, a2);
+        sys_cputs((const char *)a1, a2);
         return 0;
     case SYS_cgetc:
         return sys_cgetc();
@@ -544,36 +599,36 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
     case SYS_env_destroy:
         return sys_env_destroy(a1);
     case SYS_page_alloc:
-        return sys_page_alloc(a1, (void*) a2, a3);
+        return sys_page_alloc(a1, (void *)a2, a3);
     case SYS_page_map:
-        return sys_page_map(a1, (void*) a2, a3, (void*) a4, a5);
+        return sys_page_map(a1, (void *)a2, a3, (void *)a4, a5);
     case SYS_page_unmap:
-        return sys_page_unmap(a1, (void*) a2);
+        return sys_page_unmap(a1, (void *)a2);
     case SYS_exofork:
         return sys_exofork();
     case SYS_env_set_status:
         return sys_env_set_status(a1, a2);
     case SYS_env_set_trapframe:
-        return sys_env_set_trapframe(a1, (struct Trapframe*) a2);
+        return sys_env_set_trapframe(a1, (struct Trapframe *)a2);
     case SYS_env_set_pgfault_upcall:
-        return sys_env_set_pgfault_upcall(a1, (void*) a2);
+        return sys_env_set_pgfault_upcall(a1, (void *)a2);
     case SYS_yield:
         sys_yield();
         return 0;
     case SYS_ipc_try_send:
-        return sys_ipc_try_send(a1, a2, (void*) a3, a4);
+        return sys_ipc_try_send(a1, a2, (void *)a3, a4);
     case SYS_ipc_recv:
-        sys_ipc_recv((void*) a1);
+        sys_ipc_recv((void *)a1);
         return 0;
     case SYS_time_msec:
         return sys_time_msec();
     case SYS_net_transmit:
-        return sys_net_transmit((const void*)a1, a2);
+        return sys_net_transmit((const void *)a1, a2);
     case SYS_net_receive:
-        return sys_net_receive((void*)a1, a2);
+        return sys_net_receive((void *)a1, a2);
 #ifndef VMM_GUEST
     case SYS_ept_map:
-        return sys_ept_map(a1, (void*) a2, a3, (void*) a4, a5);
+        return sys_ept_map(a1, (void *)a2, a3, (void *)a4, a5);
     case SYS_env_mkguest:
         return sys_env_mkguest(a1, a2);
     case SYS_vmx_list_vms:
@@ -594,9 +649,8 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 }
 
 #ifdef TEST_EPT_MAP
-int
-_export_sys_ept_map(envid_t srcenvid, void *srcva,
-            envid_t guest, void* guest_pa, int perm)
+int _export_sys_ept_map(envid_t srcenvid, void *srcva,
+                        envid_t guest, void *guest_pa, int perm)
 {
     return sys_ept_map(srcenvid, srcva, guest, guest_pa, perm);
 }
